@@ -1,6 +1,6 @@
 # Reishandy's RMMZ Plugin Collection
 
-This repository contains a collection of plugins for RPG Maker MZ by Me.
+A compilation of RPG Maker MZ plugins created for my own project.
 
 ## 📋 Plugin List
 
