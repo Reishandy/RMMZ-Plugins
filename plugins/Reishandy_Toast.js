@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc v1.0.0 - A simple toast notification system for RPG Maker MZ
+ * @plugindesc v1.0.1 - A simple toast notification system for RPG Maker MZ
  * @author Reishandy
  *
  * @param MaxWidth
@@ -44,7 +44,7 @@
  * @default Bottom
  *
  * @help
- * Reishandy_Toast.js - Version 1.0.0
+ * Reishandy_Toast.js - Version 1.0.1
  * ============================================================================
  *
  * Description:
@@ -179,14 +179,15 @@
     Window_Toast.prototype.showMessage = function (text) {
         const maxWidth = Math.floor(Graphics.width * MAX_WIDTH_PERCENT);
         const padding = this.padding * 2;
-
+    
+        const processedText = this.convertEscapeCharacters(text);
         const lines = [];
-        const words = text.split(" ");
+        const words = processedText.split(" ");
         let currentLine = words[0];
-
+    
         for (let i = 1; i < words.length; i++) {
             const testLine = currentLine + " " + words[i];
-            if (this.textWidth(testLine) > maxWidth - padding - 32) {
+            if (this.textSizeEx(testLine).width > maxWidth - padding - 32) {
                 lines.push(currentLine);
                 currentLine = words[i];
             } else {
@@ -194,22 +195,24 @@
             }
         }
         lines.push(currentLine);
-
-        const width = Math.min(maxWidth, Math.max(...lines.map(line => this.textWidth(line))) + padding + 32);
+    
+        const width = Math.min(maxWidth, Math.max(...lines.map(line => this.textSizeEx(line).width)) + padding + 32);
         const height = this.lineHeight() * lines.length + padding;
-
+    
         this.width = width;
         this.height = height;
         this.x = (Graphics.width - width) / 2;
         this.y = TOAST_POSITION === "Top" ? 0 : Graphics.height - height - 100;
-
+    
         this.createContents();
         this.count = DISPLAY_TIME;
         this.show();
         this.contents.clear();
-
+    
         lines.forEach((line, index) => {
-            this.drawText(line, 0, this.lineHeight() * index, width - padding, 'center');
+            const lineWidth = this.textSizeEx(line).width;
+            const x = Math.max(0, (width - padding - lineWidth) / 2);
+            this.drawTextEx(line, x, this.lineHeight() * index);
         });
     };
 

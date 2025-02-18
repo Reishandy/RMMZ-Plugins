@@ -59,6 +59,7 @@ $gameSystem.showToast("Your message here");
 
 - **InputWidth:** Percentage of the screen width for the text input box.
 - **InputHeight:** Percentage of the screen height for the text input box.
+- **InputSaveHelpText** The text shown below the ok button as a help text, use double backslashes to escape. e.g. \\c[1] \\v[1] \\n[1]
 
 **Commands:**
 

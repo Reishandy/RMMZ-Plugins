@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc v1.0.4 - A simple multi-line text input system for RPG Maker MZ
+ * @plugindesc v1.0.5 - A simple multi-line text input system for RPG Maker MZ
  * @author Reishandy
  *
  * @param InputWidth
@@ -18,9 +18,15 @@
  * @text Input Height (%)
  * @desc Percentage of the screen height for the text input box.
  * @default 50
+ * 
+ * @param InputSaveHelpText
+ * @type string
+ * @text Input save help text
+ * @desc The text shown below the ok button as a help text, use double backslashes to escape. e.g. \\c[1] \\v[1] \\n[1]
+ * @default Press \\c[1]Shift+Enter\\c[0] to save input
  *
  * @help
- * Reishandy_TextInput.js - Version 1.0.4
+ * Reishandy_TextInput.js - Version 1.0.5
  * =======================================================================
  *
  * Description:
@@ -67,6 +73,7 @@
  * - The input element is hidden and positioned off-screen
  * - The text input is processed in real-time and displayed in the window
  * - It is not very optimized
+ * - Backslashes are escaped to handle special cases, so it's a bit weird
  *
  * Compatibility:
  * - RPG Maker MZ
@@ -113,6 +120,7 @@
  * @type string
  * @text Text
  * @desc The text to store in the variable.
+ * @desc The text to store in the variable.
  * @default
  */
 
@@ -129,6 +137,7 @@
     const INPUT_HEIGHT_PERCENT = Number(params["InputHeight"]) / 100;
     // If not provided, default max lines is 10
     const DEFAULT_MAX_LINES = Number(params["DefaultMaxLines"] || 10);
+    const INPUT_SAVE_HELP_TEXT = String(params["InputSaveHelpText"] || "Press \\c[1]Shift+Enter\\c[0] to save input");
 
     //-------------------------------------------------------------------------
     // Plugin Command Registration
@@ -201,9 +210,11 @@
          */
         createLabelWindow() {
             const width = Graphics.boxWidth * INPUT_WIDTH_PERCENT;
-            
+
             // Calculate text dimensions using a temporary window
-            const tempWindow = new Window_Base(new Rectangle(0, 0, width, this.calcWindowHeight(1)));
+            const tempWindow = new Window_Base(
+                new Rectangle(0, 0, width, this.calcWindowHeight(1))
+            );
             const textSize = tempWindow.textSizeEx(this._label);
             const textHeight = textSize.height;
             const textWidth = textSize.width;
@@ -213,19 +224,23 @@
 
             const x = (Graphics.boxWidth - width) / 2;
 
-            this._labelWindow = new Window_Base(new Rectangle(x, this._positions.labelY, width, height));
-            
+            this._labelWindow = new Window_Base(
+                new Rectangle(x, this._positions.labelY, width, height)
+            );
+
             // Calculate the starting position for the text to be centered
             const textX = Math.max(0, (width - padding - textWidth) / 2);
             const textY = (height - padding - textHeight) / 2;
-            
+
             this._labelWindow.drawTextEx(this._label, textX, textY, width);
             this.addWindow(this._labelWindow);
 
             // Recalculate input and button positions based on the actual label height
             this._positions.inputY = this._positions.labelY + height + 10;
-            this._positions.buttonY = this._positions.inputY + 
-                (Graphics.boxHeight * INPUT_HEIGHT_PERCENT) + 20;
+            this._positions.buttonY =
+                this._positions.inputY +
+                Graphics.boxHeight * INPUT_HEIGHT_PERCENT +
+                20;
         }
 
         /**
@@ -251,15 +266,16 @@
          */
         createOkButton() {
             // Calculate base dimensions using a temporary window
-            const tempWindow = new Window_Base(new Rectangle(0, 0, 200, this.calcWindowHeight(1)));
-            const checkmark = "✔";
-            const textWidth = tempWindow.textWidth(checkmark);
+            const tempWindow = new Window_Base(
+                new Rectangle(0, 0, 200, this.calcWindowHeight(1))
+            );
             const textHeight = tempWindow.lineHeight();
-            const padding = tempWindow.padding * 3;
-            
+            const helpWidth = tempWindow.textWidth(INPUT_SAVE_HELP_TEXT);
+            const padding = tempWindow.padding * 2;
+
             // Set minimum dimensions while allowing for content-based sizing
-            const width = Math.max(Graphics.boxWidth * 0.15, textWidth + padding + 48);
-            const height = textHeight + padding;
+            const width = Math.max(Graphics.boxWidth * 0.15, helpWidth + 20);
+            const height = textHeight + padding + 20;
             tempWindow.destroy();
 
             const x = (Graphics.boxWidth - width) / 2;
@@ -270,7 +286,7 @@
                 width,
                 height
             );
-            
+
             this._okButton.setHandler("ok", this.onInputOk.bind(this));
             this.addWindow(this._okButton);
         }
@@ -280,7 +296,7 @@
          * Saves the entered text to the specified game variable and exits the scene.
          */
         onInputOk() {
-            const text = this._inputWindow.inputText() || 0; // Default to 0 int if empty, for compatibility with conditional branches
+            const text = this._inputWindow.inputText().trim() || 0; // Default to 0 int if empty, for compatibility with conditional branches
             $gameVariables.setValue(this._variableId, text);
             this.popScene();
         }
@@ -701,6 +717,13 @@
 
             // Keydown handler
             this._boundHandleKeyDown = (event) => {
+                if (event.shiftKey && event.key === "Enter") {
+                    event.preventDefault();
+                    this.playOkSound();
+                    this.triggerOk();
+                    return;
+                }
+
                 switch (event.key) {
                     case "ArrowLeft":
                         event.preventDefault();
@@ -828,6 +851,16 @@
             }
             super.destroy();
         }
+
+        /**
+         * Triggers the OK button action from the scene.
+         */
+        triggerOk() {
+            const scene = SceneManager._scene;
+            if (scene && typeof scene.onInputOk === "function") {
+                scene.onInputOk();
+            }
+        }
     }
 
     //-------------------------------------------------------------------------
@@ -843,17 +876,43 @@
          * @param {number} height - Height of the button.
          */
         constructor(x, y, width, height) {
-            super(new Rectangle(x, y, width, height));
+            super(new Rectangle(x, y, width, height + 40)); // Increase height to accommodate explanation text
             this.refresh();
         }
-    
+
         /**
-         * Defines the command list with a localized "OK" text.
+         * Defines the command list with a checkmark icon.
          */
         makeCommandList() {
             this.addCommand("✔", "ok");
         }
-    
+
+        /**
+         * Draws all items in the window.
+         */
+        drawAllItems() {
+            super.drawAllItems();
+            this.drawHelpText();
+        }
+
+        /**
+         * Draws the explanation text below the OK button.
+         */
+        drawHelpText() {
+            const explanationText =
+                "Press \\c[1]Shift+Enter\\c[0] to save input";
+            const tempWindow = new Window_Base(new Rectangle(0, 0, 0, 0));
+            const processedText =
+                tempWindow.convertEscapeCharacters(explanationText);
+
+            const width = this.contentsWidth() - this.padding * 2;
+            const textWidth = this.textSizeEx(processedText).width;
+            const x = Math.max(this.padding, (width - textWidth) / 1.5);
+            const y = this.itemHeight() + 10; // Position below the OK button
+
+            this.drawTextEx(processedText, x, y, width);
+        }
+
         /**
          * Updates the button, processing touch input only.
          */
@@ -866,14 +925,14 @@
                 }
             }
         }
-    
+
         /**
          * Plays a sound effect when button is pressed.
          */
         playCursorSound() {
             SoundManager.playOk();
         }
-    
+
         /**
          * Checks if a given (x, y) coordinate is inside the button area.
          * @param {number} x - The x coordinate to check
@@ -888,7 +947,7 @@
                 y < this.y + this.height
             );
         }
-    
+
         /**
          * Overrides default keyboard handling to disable accidental triggering.
          */
