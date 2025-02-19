@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc v1.0.5 - A simple multi-line text input system for RPG Maker MZ
+ * @plugindesc v1.0.6 - A simple multi-line text input system for RPG Maker MZ
  * @author Reishandy
  *
  * @param InputWidth
@@ -18,15 +18,21 @@
  * @text Input Height (%)
  * @desc Percentage of the screen height for the text input box.
  * @default 50
- * 
+ *
  * @param InputSaveHelpText
  * @type string
  * @text Input save help text
- * @desc The text shown below the ok button as a help text, use double backslashes to escape. e.g. \\c[1] \\v[1] \\n[1]
- * @default Press \\c[1]Shift+Enter\\c[0] to save input
+ * @desc The text shown below the ok button as a help text, use double backslashes to escape. e.g. \c[1] \v[1] \n[1]
+ * @default Press \c[1]Shift+Enter\c[0] to save input
+ * 
+ * @param OkButtonText
+ * @type string
+ * @text OK Button Text
+ * @desc The text displayed on the OK button.
+ * @default ✔
  *
  * @help
- * Reishandy_TextInput.js - Version 1.0.5
+ * Reishandy_TextInput.js - Version 1.0.6
  * =======================================================================
  *
  * Description:
@@ -72,8 +78,7 @@
  * - The text input is handled using an HTML input element
  * - The input element is hidden and positioned off-screen
  * - The text input is processed in real-time and displayed in the window
- * - It is not very optimized
- * - Backslashes are escaped to handle special cases, so it's a bit weird
+ * - Supports composition events for IME and mobile keyboard input
  *
  * Compatibility:
  * - RPG Maker MZ
@@ -137,7 +142,7 @@
     const INPUT_HEIGHT_PERCENT = Number(params["InputHeight"]) / 100;
     // If not provided, default max lines is 10
     const DEFAULT_MAX_LINES = Number(params["DefaultMaxLines"] || 10);
-    const INPUT_SAVE_HELP_TEXT = String(params["InputSaveHelpText"] || "Press \\c[1]Shift+Enter\\c[0] to save input");
+    const INPUT_SAVE_HELP_TEXT = String(params["InputSaveHelpText"]) || "Press \\c[1]Shift+Enter\\c[0] to save input";
 
     //-------------------------------------------------------------------------
     // Plugin Command Registration
@@ -353,11 +358,10 @@
             }
             this._visibleStartLine = startLine;
 
-            // Draw each visible line with RPG Maker's escape codes processing.
             for (let i = 0; i < maxVisibleLines; i++) {
                 const lineIndex = startLine + i;
                 if (lineIndex < this._lines.length) {
-                    this.drawTextEx(
+                    this.drawText(
                         this._lines[lineIndex],
                         this.padding,
                         this.padding + i * this.lineHeight()
@@ -584,12 +588,8 @@
          */
         processChar(char) {
             const line = this._lines[this._cursorY];
-            // Escape backslashes to handle special cases
-            const processedChar = char === "\\" ? "\\\\" : char;
             const potentialLine =
-                line.slice(0, this._cursorX) +
-                processedChar +
-                line.slice(this._cursorX);
+                line.slice(0, this._cursorX) + char + line.slice(this._cursorX);
             const textWidth = this.textWidth(potentialLine);
             const maxWidth = this.contentsWidth() - this.padding * 2;
 
@@ -609,31 +609,21 @@
             }
             // Insert the character into the current line.
             this._lines[this._cursorY] = potentialLine;
-            this._cursorX += processedChar.length;
+            this._cursorX += char.length;
             this.refresh();
         }
 
         /**
          * Processes backspace key to delete characters.
-         * It handles deletion of escaped backslashes as a single unit.
          */
         processBackspace() {
             const line = this._lines[this._cursorY];
             if (this._cursorX > 0) {
-                // Check if the previous two characters form an escaped backslash.
-                const prevChars = line.slice(this._cursorX - 2, this._cursorX);
-                if (prevChars === "\\\\") {
-                    this._lines[this._cursorY] =
-                        line.slice(0, this._cursorX - 2) +
-                        line.slice(this._cursorX);
-                    this._cursorX -= 2;
-                } else {
-                    // Remove single character.
-                    this._lines[this._cursorY] =
-                        line.slice(0, this._cursorX - 1) +
-                        line.slice(this._cursorX);
-                    this._cursorX--;
-                }
+                // Remove single character.
+                this._lines[this._cursorY] =
+                    line.slice(0, this._cursorX - 1) +
+                    line.slice(this._cursorX);
+                this._cursorX--;
             } else if (this._cursorY > 0) {
                 // Merge current line with previous line if at the beginning.
                 const previousLine = this._lines[this._cursorY - 1];
@@ -899,11 +889,9 @@
          * Draws the explanation text below the OK button.
          */
         drawHelpText() {
-            const explanationText =
-                "Press \\c[1]Shift+Enter\\c[0] to save input";
             const tempWindow = new Window_Base(new Rectangle(0, 0, 0, 0));
             const processedText =
-                tempWindow.convertEscapeCharacters(explanationText);
+                tempWindow.convertEscapeCharacters(INPUT_SAVE_HELP_TEXT);
 
             const width = this.contentsWidth() - this.padding * 2;
             const textWidth = this.textSizeEx(processedText).width;
