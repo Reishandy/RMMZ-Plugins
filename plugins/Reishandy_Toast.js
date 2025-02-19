@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc v1.0.1 - A simple toast notification system for RPG Maker MZ
+ * @plugindesc v1.0.2 - A simple toast notification system for RPG Maker MZ
  * @author Reishandy
  *
  * @param MaxWidth
@@ -14,15 +14,23 @@
  * @param MaxToasts
  * @type number
  * @min 1
- * @max 10
+ * @max 100
  * @text Maximum Toasts
  * @desc Maximum number of toasts that can be displayed at once.
+ * @default 3
+ *
+ * @param MaxLines
+ * @type number
+ * @min 1
+ * @max 100
+ * @text Maximum Lines
+ * @desc Maximum number of lines for toast messages. Text will be truncated if exceeds.
  * @default 3
  *
  * @param DisplayTime
  * @type number
  * @min 30
- * @max 600
+ * @max 3600
  * @text Display Duration
  * @desc How long toasts stay visible (in frames, 60 frames = 1 second)
  * @default 180
@@ -43,8 +51,15 @@
  * @desc Position of the toasts on the screen (Top or Bottom).
  * @default Bottom
  *
+ * @param SoundEffect
+ * @type struct<SoundEffect>
+ * @text Sound Effect
+ * @desc Sound effect settings for toast notifications.
+ * @default {"enabled":"true","name":"Decision5","volume":"60","pitch":"100","pan":"0"}
+ *
+ *
  * @help
- * Reishandy_Toast.js - Version 1.0.1
+ * Reishandy_Toast.js - Version 1.0.2
  * ============================================================================
  *
  * Description:
@@ -91,6 +106,45 @@
  * @desc The text to show in the toast notification.
  */
 
+/*~struct~SoundEffect:
+ * @param enabled
+ * @type boolean
+ * @text Enable Sound
+ * @desc Play a sound effect when toast appears?
+ * @default true
+ *
+ * @param name
+ * @type file
+ * @dir audio/se/
+ * @text Sound Effect
+ * @desc Sound effect to play when toast appears. Leave empty to disable.
+ * @default Decision5
+ *
+ * @param volume
+ * @type number
+ * @min 0
+ * @max 100
+ * @text Volume
+ * @desc Volume of the sound effect (0-100)
+ * @default 60
+ *
+ * @param pitch
+ * @type number
+ * @min 50
+ * @max 150
+ * @text Pitch
+ * @desc Pitch of the sound effect (50-150)
+ * @default 100
+ *
+ * @param pan
+ * @type number
+ * @min -100
+ * @max 100
+ * @text Pan
+ * @desc Pan of the sound effect (-100 to 100)
+ * @default 0
+ */
+
 (() => {
     "use strict";
 
@@ -101,6 +155,14 @@
     const DISPLAY_TIME = Number(params["DisplayTime"]);
     const SLIDE_SPEED = Number(params["SlideSpeed"]);
     const TOAST_POSITION = params["ToastPosition"];
+    const MAX_LINES = Number(params["MaxLines"]);
+    const soundSettings = JSON.parse(params["SoundEffect"] || "{}");
+    const ENABLE_SOUND =
+        String(soundSettings.enabled || "false").toLowerCase() === "true";
+    const SOUND_NAME = soundSettings.name;
+    const SOUND_VOLUME = Number(soundSettings.volume);
+    const SOUND_PITCH = Number(soundSettings.pitch);
+    const SOUND_PAN = Number(soundSettings.pan);
     const toastQueue = [];
     let isProcessingQueue = false;
 
@@ -152,19 +214,22 @@
     };
 
     Window_Toast.prototype.updatePosition = function () {
-        const baseY = TOAST_POSITION === "Top" ? 0 : Graphics.height - this.height - 100;
+        const baseY =
+            TOAST_POSITION === "Top" ? 0 : Graphics.height - this.height - 100;
         const currentToasts = SceneManager._scene._activeToasts;
         const myIndex = currentToasts.indexOf(this);
         let totalOffset = 0;
-        const toastSpacing = 10;
 
         for (let i = 0; i < myIndex; i++) {
             if (currentToasts[i] && currentToasts[i].visible) {
-                totalOffset += currentToasts[i].height + toastSpacing;
+                totalOffset += currentToasts[i].height;
             }
         }
 
-        let targetY = TOAST_POSITION === "Top" ? baseY + totalOffset + this.slideY : baseY - totalOffset + this.slideY;
+        let targetY =
+            TOAST_POSITION === "Top"
+                ? baseY + totalOffset + this.slideY
+                : baseY - totalOffset + this.slideY;
         this.y = targetY;
     };
 
@@ -177,14 +242,23 @@
     };
 
     Window_Toast.prototype.showMessage = function (text) {
+        if (ENABLE_SOUND && SOUND_NAME) {
+            AudioManager.playSe({
+                name: SOUND_NAME,
+                volume: SOUND_VOLUME,
+                pitch: SOUND_PITCH,
+                pan: SOUND_PAN,
+            });
+        }
+
         const maxWidth = Math.floor(Graphics.width * MAX_WIDTH_PERCENT);
         const padding = this.padding * 2;
-    
+
         const processedText = this.convertEscapeCharacters(text);
         const lines = [];
         const words = processedText.split(" ");
         let currentLine = words[0];
-    
+
         for (let i = 1; i < words.length; i++) {
             const testLine = currentLine + " " + words[i];
             if (this.textSizeEx(testLine).width > maxWidth - padding - 32) {
@@ -195,24 +269,37 @@
             }
         }
         lines.push(currentLine);
-    
-        const width = Math.min(maxWidth, Math.max(...lines.map(line => this.textSizeEx(line).width)) + padding + 32);
-        const height = this.lineHeight() * lines.length + padding;
-    
+
+        if (lines.length > MAX_LINES) {
+            const excessLines = lines.splice(MAX_LINES - 1);
+            lines[MAX_LINES - 1] = excessLines[0] + "...";
+        }
+
+        const width = Math.min(
+            maxWidth,
+            Math.max(...lines.map((line) => this.textSizeEx(line).width)) +
+                padding +
+                32
+        );
+        const height =
+            this.lineHeight() * Math.min(lines.length, MAX_LINES) + padding;
+
         this.width = width;
         this.height = height;
         this.x = (Graphics.width - width) / 2;
         this.y = TOAST_POSITION === "Top" ? 0 : Graphics.height - height - 100;
-    
+
         this.createContents();
         this.count = DISPLAY_TIME;
         this.show();
         this.contents.clear();
-    
+
         lines.forEach((line, index) => {
-            const lineWidth = this.textSizeEx(line).width;
-            const x = Math.max(0, (width - padding - lineWidth) / 2);
-            this.drawTextEx(line, x, this.lineHeight() * index);
+            if (index < MAX_LINES) {
+                const lineWidth = this.textSizeEx(line).width;
+                const x = Math.max(0, (width - padding - lineWidth) / 2);
+                this.drawTextEx(line, x, this.lineHeight() * index);
+            }
         });
     };
 
@@ -226,11 +313,11 @@
             SceneManager._scene._activeToasts = [];
         }
 
-        SceneManager._scene._activeToasts = SceneManager._scene._activeToasts.filter(toast =>
-            toast && toast.visible && toast.contentsOpacity > 0
-        );
+        SceneManager._scene._activeToasts =
+            SceneManager._scene._activeToasts.filter(
+                (toast) => toast && toast.visible && toast.contentsOpacity > 0
+            );
 
-        // If there are too many toasts, remove the oldest one
         if (SceneManager._scene._activeToasts.length >= MAX_TOASTS) {
             const oldestToast = SceneManager._scene._activeToasts.pop();
             if (oldestToast) {
