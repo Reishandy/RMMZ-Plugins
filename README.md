@@ -7,6 +7,7 @@ A compilation of RPG Maker MZ plugins created for my own project.
 1. [Reishandy_Toast.js](#1-reishandy_toastjs)
 2. [Reishandy_TextInput.js](#2-reishandy_textinputjs)
 3. [Reishandy_CompactMenu.js](#3-reishandy_compactmenujs)
+4. [Reishandy_PathFindMove.js](#4-reishandy_pathfindmovejs)
 
 ---
 
@@ -98,6 +99,43 @@ Plugin Command -> Reishandy_TextInput : SetTextVariable
 **Usage:**
 
 This plugin automatically modifies the main menu layout to remove the actor status window and make the command and gold windows more compact. No additional setup is required.
+
+---
+
+### 4. Reishandy_PathFindMove.js
+
+**Description:** Smart pathfinding movement system for events and player.
+
+**Parameters:**
+
+- **MaxIteration:** Maximum number of iterations for the pathfinding algorithm (100-10000).
+- **ThroughIfHardBlocked:** If enabled, characters will move through hard blocked situations.
+
+**Commands:**
+
+- **MoveTo:** Makes a character move to a specific destination using pathfinding.
+
+**Usage:**
+
+To make a character move to a destination, use the following plugin command:
+
+```
+Plugin Command -> Reishandy_PathFindMove : MoveTo
+- Subject: [This Event/Specific Event/Player]
+- Event ID: (if Subject is "Specific Event")
+- Target Type: [Coordinates/Specific Event]
+- X/Y: (if Target Type is "Coordinates")
+- Target Event ID: (if Target Type is "Specific Event")
+- Recalculate If Blocked: true/false
+```
+
+Example to move current event to coordinates (5,7):
+```
+Subject: This Event
+Target Type: Coordinates
+X: 5
+Y: 7
+```
 
 ---
 
