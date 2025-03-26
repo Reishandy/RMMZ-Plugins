@@ -24,7 +24,7 @@
  * @text Input save help text
  * @desc The text shown below the ok button as a help text, use double backslashes to escape. e.g. \c[1] \v[1] \n[1]
  * @default Press \c[1]Shift+Enter\c[0] to save input
- * 
+ *
  * @param OkButtonText
  * @type string
  * @text OK Button Text
@@ -127,7 +127,7 @@
  * @desc The text to store in the variable.
  * @desc The text to store in the variable.
  * @default
- * 
+ *
  * @command OpenNameInput
  * @text Open Name Input
  * @desc Opens a single-line text input box for actor name with actor face display.
@@ -142,7 +142,7 @@
  * @text Label Text
  * @desc The label displayed above the input box.
  * @default Enter name:
- * 
+ *
  * @arg defaultMaxCharacters
  * @type number
  * @text Default Max Characters
@@ -165,7 +165,9 @@
     const INPUT_HEIGHT_PERCENT = Number(params["InputHeight"]) / 100;
     // If not provided, default max lines is 10
     const DEFAULT_MAX_LINES = Number(params["DefaultMaxLines"] || 10);
-    const INPUT_SAVE_HELP_TEXT = String(params["InputSaveHelpText"]) || "Press \\c[1]Shift+Enter\\c[0] to save input";
+    const INPUT_SAVE_HELP_TEXT =
+        String(params["InputSaveHelpText"]) ||
+        "Press \\c[1]Shift+Enter\\c[0] to save input";
 
     //-------------------------------------------------------------------------
     // Plugin Command Registration
@@ -195,7 +197,11 @@
         const maxChars = Number(args.defaultMaxCharacters || 12);
         // Push the name input scene and prepare it with provided parameters
         SceneManager.push(Scene_NameInput);
-        SceneManager.prepareNextScene($gameActors.actor(actorId), label, maxChars);
+        SceneManager.prepareNextScene(
+            $gameActors.actor(actorId),
+            label,
+            maxChars
+        );
     });
 
     //-------------------------------------------------------------------------
@@ -276,7 +282,8 @@
             this._positions.inputY = this._positions.labelY + height + 10;
             this._positions.buttonY =
                 this._positions.inputY +
-                Graphics.boxHeight * INPUT_HEIGHT_PERCENT + 10;
+                Graphics.boxHeight * INPUT_HEIGHT_PERCENT +
+                10;
         }
 
         /**
@@ -382,8 +389,10 @@
             const x = (Graphics.boxWidth - width) / 2;
             const height = this.calcWindowHeight(1);
 
-            this._labelWindow = new Window_Base(new Rectangle(x, this._positions.labelY, width, height));
-            this._labelWindow.drawText(this._label, 0, 0, width, 'center');
+            this._labelWindow = new Window_Base(
+                new Rectangle(x, this._positions.labelY, width, height)
+            );
+            this._labelWindow.drawText(this._label, 0, 0, width, "center");
             this.addWindow(this._labelWindow);
         }
 
@@ -392,7 +401,7 @@
             // Set height to match face height plus padding
             const height = ImageManager.faceHeight + 20;
             const x = (Graphics.boxWidth - width) / 2;
-            
+
             this._inputWindow = new Window_NameInput(
                 x,
                 this._positions.inputY,
@@ -494,8 +503,6 @@
                 }
             }
         }
-
-        
 
         //-------------------------------------------------------------------------
         // Utils
@@ -737,6 +744,7 @@
             // Insert the character into the current line.
             this._lines[this._cursorY] = potentialLine;
             this._cursorX += char.length;
+            SoundManager.playCursor();
             this.refresh();
         }
 
@@ -759,6 +767,7 @@
                 this._lines.splice(this._cursorY, 1);
                 this._cursorY--;
             }
+            SoundManager.playCancel();
             this.refresh();
         }
 
@@ -989,52 +998,53 @@
             this._actor = actor;
             this._maxChars = maxChars;
             super.initialize(x, y, width, height, 1); // maxLines = 1
-            
+
             // Set initial text to actor's current name
             this._lines[0] = this._actor.name();
             this._cursorX = this._lines[0].length;
-            
+
             this.refresh();
         }
-    
+
         refresh() {
             this.contents.clear();
             this.drawActorFace();
             this.drawTextLines();
             this.drawCursor();
         }
-    
+
         drawActorFace() {
             const faceWidth = ImageManager.faceWidth;
             const faceHeight = ImageManager.faceHeight;
             const padding = this.padding;
-    
+
             // Draw face on the left side
             this.drawFace(
-                this._actor.faceName(), 
-                this._actor.faceIndex(), 
-                padding, 
+                this._actor.faceName(),
+                this._actor.faceIndex(),
+                padding,
                 padding,
                 faceWidth,
                 faceHeight
             );
         }
-    
+
         drawTextLines() {
             const faceWidth = ImageManager.faceWidth;
-            const padding = this.padding;
-            
-            // Calculate center position for text
+            const padding = 8; // Reduced padding from default
+    
+            // Calculate center position for text horizontally
             const availableWidth = this.width - (faceWidth + padding * 4);
             const line = this._lines[0] || "";
             const textWidth = this.textWidth(line);
             const textStartX = faceWidth + padding * 2 + Math.max(0, (availableWidth - textWidth) / 2);
-            const textY = Math.floor((ImageManager.faceHeight - this.lineHeight()) / 2);
+    
+            const textY = padding;
     
             this.drawText(
                 line,
                 textStartX,
-                padding + textY,
+                textY, // Removed extra padding
                 availableWidth,
                 'left'
             );
@@ -1045,18 +1055,18 @@
     
             const line = this._lines[this._cursorY];
             const faceWidth = ImageManager.faceWidth;
-            const padding = this.padding;
-            
+            const padding = 8;
+    
             const availableWidth = this.width - (faceWidth + padding * 4);
             const textWidth = this.textWidth(line);
             const textStartX = faceWidth + padding * 2 + Math.max(0, (availableWidth - textWidth) / 2);
-            
-            const textY = Math.floor((ImageManager.faceHeight - this.lineHeight()) / 2);
+    
+            const textY = padding;
             const cursorX = textStartX + this.textWidth(line.substring(0, this._cursorX));
     
             this.contents.fillRect(
                 cursorX,
-                padding + textY + this.lineHeight() - 2,
+                textY + this.lineHeight() - 2,
                 10,
                 2,
                 ColorManager.normalColor()
@@ -1071,13 +1081,13 @@
             }
             super.processChar(char);
         }
-    
+
         isTouchedInside() {
             const faceWidth = ImageManager.faceWidth;
             const padding = this.padding;
             const touchX = TouchInput.x - this.x - (faceWidth + padding * 2);
             const touchY = TouchInput.y - this.y - this.padding;
-            
+
             return (
                 touchX >= 0 &&
                 touchX < this.width - (faceWidth + padding * 2) &&
