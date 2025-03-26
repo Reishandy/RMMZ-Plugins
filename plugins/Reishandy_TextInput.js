@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc v1.0.6 - A simple multi-line text input system for RPG Maker MZ
+ * @plugindesc v1.0.7 - A simple multi-line text input system for RPG Maker MZ
  * @author Reishandy
  *
  * @param InputWidth
@@ -32,7 +32,7 @@
  * @default ✔
  *
  * @help
- * Reishandy_TextInput.js - Version 1.0.6
+ * Reishandy_TextInput.js - Version 1.0.7
  * =======================================================================
  *
  * Description:
@@ -127,6 +127,29 @@
  * @desc The text to store in the variable.
  * @desc The text to store in the variable.
  * @default
+ * 
+ * @command OpenNameInput
+ * @text Open Name Input
+ * @desc Opens a single-line text input box for actor name with actor face display.
+ *
+ * @arg actorId
+ * @type actor
+ * @text Actor ID
+ * @desc The actor whose name will be changed.
+ *
+ * @arg label
+ * @type string
+ * @text Label Text
+ * @desc The label displayed above the input box.
+ * @default Enter name:
+ * 
+ * @arg defaultMaxCharacters
+ * @type number
+ * @text Default Max Characters
+ * @desc Maximum number of characters allowed in name input. Default is 12.
+ * @min 1
+ * @max 32
+ * @default 12
  */
 
 (() => {
@@ -166,6 +189,15 @@
         $gameVariables.setValue(variableId, text);
     });
 
+    PluginManager.registerCommand(PLUGIN_NAME, "OpenNameInput", (args) => {
+        const actorId = Number(args.actorId);
+        const label = args.label || "Enter name:";
+        const maxChars = Number(args.defaultMaxCharacters || 12);
+        // Push the name input scene and prepare it with provided parameters
+        SceneManager.push(Scene_NameInput);
+        SceneManager.prepareNextScene($gameActors.actor(actorId), label, maxChars);
+    });
+
     //-------------------------------------------------------------------------
     // Scene for Text Input
     //-------------------------------------------------------------------------
@@ -200,13 +232,13 @@
             const inputHeight = Graphics.boxHeight * INPUT_HEIGHT_PERCENT;
             const buttonHeight = Graphics.boxHeight * 0.13;
             // Total height including padding between windows
-            const totalHeight = labelHeight + inputHeight + buttonHeight + 20;
+            const totalHeight = labelHeight + inputHeight + buttonHeight + 40;
             const startY = (Graphics.boxHeight - totalHeight) / 2;
 
             this._positions = {
                 labelY: startY,
                 inputY: startY + labelHeight + 10,
-                buttonY: startY + labelHeight + inputHeight + 20,
+                buttonY: startY + labelHeight + inputHeight,
             };
         }
 
@@ -244,8 +276,7 @@
             this._positions.inputY = this._positions.labelY + height + 10;
             this._positions.buttonY =
                 this._positions.inputY +
-                Graphics.boxHeight * INPUT_HEIGHT_PERCENT +
-                20;
+                Graphics.boxHeight * INPUT_HEIGHT_PERCENT + 10;
         }
 
         /**
@@ -315,6 +346,100 @@
         }
     }
 
+    class Scene_NameInput extends Scene_MenuBase {
+        prepare(actor, label, maxChars) {
+            this._label = label;
+            this._actor = actor;
+            this._maxChars = maxChars;
+        }
+
+        create() {
+            super.create();
+            this.createWindowLayer();
+            this.calculateWindowPositions();
+            this.createLabelWindow();
+            this.createInputWindow();
+            this.createOkButton();
+        }
+
+        calculateWindowPositions() {
+            const labelHeight = Graphics.boxHeight * 0.12;
+            // Set height to match face height plus padding
+            const inputHeight = ImageManager.faceHeight + 20;
+            const buttonHeight = Graphics.boxHeight * 0.13;
+            const totalHeight = labelHeight + inputHeight + buttonHeight + 40;
+            const startY = (Graphics.boxHeight - totalHeight) / 2;
+
+            this._positions = {
+                labelY: startY,
+                inputY: startY + labelHeight + 10,
+                buttonY: startY + labelHeight + inputHeight + 20,
+            };
+        }
+
+        createLabelWindow() {
+            const width = Graphics.boxWidth * INPUT_WIDTH_PERCENT;
+            const x = (Graphics.boxWidth - width) / 2;
+            const height = this.calcWindowHeight(1);
+
+            this._labelWindow = new Window_Base(new Rectangle(x, this._positions.labelY, width, height));
+            this._labelWindow.drawText(this._label, 0, 0, width, 'center');
+            this.addWindow(this._labelWindow);
+        }
+
+        createInputWindow() {
+            const width = Graphics.boxWidth * INPUT_WIDTH_PERCENT;
+            // Set height to match face height plus padding
+            const height = ImageManager.faceHeight + 20;
+            const x = (Graphics.boxWidth - width) / 2;
+            
+            this._inputWindow = new Window_NameInput(
+                x,
+                this._positions.inputY,
+                width,
+                height,
+                this._actor,
+                this._maxChars
+            );
+            this.addWindow(this._inputWindow);
+        }
+
+        createOkButton() {
+            // Calculate base dimensions using a temporary window
+            const tempWindow = new Window_Base(
+                new Rectangle(0, 0, 200, this.calcWindowHeight(1))
+            );
+            const textHeight = tempWindow.lineHeight();
+            const helpWidth = tempWindow.textWidth(INPUT_SAVE_HELP_TEXT);
+            const padding = tempWindow.padding * 2;
+
+            // Set minimum dimensions while allowing for content-based sizing
+            const width = Math.max(Graphics.boxWidth * 0.15, helpWidth + 20);
+            const height = textHeight + padding + 20;
+            tempWindow.destroy();
+
+            const x = (Graphics.boxWidth - width) / 2;
+
+            this._okButton = new Window_OkButton(
+                x,
+                this._positions.buttonY,
+                width,
+                height
+            );
+
+            this._okButton.setHandler("ok", this.onInputOk.bind(this));
+            this.addWindow(this._okButton);
+        }
+
+        onInputOk() {
+            const name = this._inputWindow.inputText().trim();
+            if (name) {
+                this._actor.setName(name);
+                this.popScene();
+            }
+        }
+    }
+
     //-------------------------------------------------------------------------
     // Window for Multi-line Text Input
     //-------------------------------------------------------------------------
@@ -369,6 +494,8 @@
                 }
             }
         }
+
+        
 
         //-------------------------------------------------------------------------
         // Utils
@@ -854,6 +981,113 @@
     }
 
     //-------------------------------------------------------------------------
+    // Window for Name Input
+    //-------------------------------------------------------------------------
+
+    class Window_NameInput extends Window_TextInput {
+        initialize(x, y, width, height, actor, maxChars) {
+            this._actor = actor;
+            this._maxChars = maxChars;
+            super.initialize(x, y, width, height, 1); // maxLines = 1
+            
+            // Set initial text to actor's current name
+            this._lines[0] = this._actor.name();
+            this._cursorX = this._lines[0].length;
+            
+            this.refresh();
+        }
+    
+        refresh() {
+            this.contents.clear();
+            this.drawActorFace();
+            this.drawTextLines();
+            this.drawCursor();
+        }
+    
+        drawActorFace() {
+            const faceWidth = ImageManager.faceWidth;
+            const faceHeight = ImageManager.faceHeight;
+            const padding = this.padding;
+    
+            // Draw face on the left side
+            this.drawFace(
+                this._actor.faceName(), 
+                this._actor.faceIndex(), 
+                padding, 
+                padding,
+                faceWidth,
+                faceHeight
+            );
+        }
+    
+        drawTextLines() {
+            const faceWidth = ImageManager.faceWidth;
+            const padding = this.padding;
+            
+            // Calculate center position for text
+            const availableWidth = this.width - (faceWidth + padding * 4);
+            const line = this._lines[0] || "";
+            const textWidth = this.textWidth(line);
+            const textStartX = faceWidth + padding * 2 + Math.max(0, (availableWidth - textWidth) / 2);
+            const textY = Math.floor((ImageManager.faceHeight - this.lineHeight()) / 2);
+    
+            this.drawText(
+                line,
+                textStartX,
+                padding + textY,
+                availableWidth,
+                'left'
+            );
+        }
+    
+        drawCursor() {
+            if (!this._cursorVisible) return;
+    
+            const line = this._lines[this._cursorY];
+            const faceWidth = ImageManager.faceWidth;
+            const padding = this.padding;
+            
+            const availableWidth = this.width - (faceWidth + padding * 4);
+            const textWidth = this.textWidth(line);
+            const textStartX = faceWidth + padding * 2 + Math.max(0, (availableWidth - textWidth) / 2);
+            
+            const textY = Math.floor((ImageManager.faceHeight - this.lineHeight()) / 2);
+            const cursorX = textStartX + this.textWidth(line.substring(0, this._cursorX));
+    
+            this.contents.fillRect(
+                cursorX,
+                padding + textY + this.lineHeight() - 2,
+                10,
+                2,
+                ColorManager.normalColor()
+            );
+        }
+
+        processChar(char) {
+            const currentText = this._lines[0] || "";
+            if (currentText.length >= this._maxChars) {
+                SoundManager.playBuzzer(); // Play error sound
+                return;
+            }
+            super.processChar(char);
+        }
+    
+        isTouchedInside() {
+            const faceWidth = ImageManager.faceWidth;
+            const padding = this.padding;
+            const touchX = TouchInput.x - this.x - (faceWidth + padding * 2);
+            const touchY = TouchInput.y - this.y - this.padding;
+            
+            return (
+                touchX >= 0 &&
+                touchX < this.width - (faceWidth + padding * 2) &&
+                touchY >= 0 &&
+                touchY < this.height
+            );
+        }
+    }
+
+    //-------------------------------------------------------------------------
     // Window for OK Button
     //-------------------------------------------------------------------------
 
@@ -950,10 +1184,10 @@
 
     // Extend SceneManager to pass parameters to the next scene
     const _SceneManager_prepareNextScene = SceneManager.prepareNextScene;
-    SceneManager.prepareNextScene = function (variableId, label, maxLines) {
+    SceneManager.prepareNextScene = function (...args) {
         _SceneManager_prepareNextScene.call(this);
         if (this._nextScene && typeof this._nextScene.prepare === "function") {
-            this._nextScene.prepare(variableId, label, maxLines);
+            this._nextScene.prepare(...args);
         }
     };
 })();
