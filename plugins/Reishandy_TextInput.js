@@ -1,6 +1,6 @@
 /*:
  * @target MZ
- * @plugindesc v1.0.9 - A simple multi-line text input system for RPG Maker MZ
+ * @plugindesc v1.1.0 - A simple multi-line text input system for RPG Maker MZ
  * @author Reishandy
  *
  * @param InputWidth
@@ -30,6 +30,14 @@
  * @text OK Button Text
  * @desc The text displayed on the OK button.
  * @default ✔
+ * 
+ * @param DefaultMaxLines
+ * @type number
+ * @min 1
+ * @max 100
+ * @text Default Max Lines
+ * @desc The default maximum number of lines for the text input.
+ * @default 10
  *
  * @param EnableOkSound
  * @type boolean
@@ -76,7 +84,7 @@
  * @desc Sound played when backspace is pressed (requires EnableCancelSound = true).
  *
  * @help
- * Reishandy_TextInput.js - Version 1.0.9
+ * Reishandy_TextInput.js - Version 1.1.0
  * =======================================================================
  *
  * Description:
@@ -245,6 +253,7 @@
     const INPUT_SAVE_HELP_TEXT =
         String(params["InputSaveHelpText"]) ||
         "Press \\c[1]Shift+Enter\\c[0] to save input";
+    const OK_BUTTON_TEXT = String(params["OkButtonText"] || "✔");
 
     // Sound parameters
     const ENABLE_OK_SOUND = params["EnableOkSound"] === "true";
@@ -1410,7 +1419,7 @@
          * Defines the command list with a checkmark icon.
          */
         makeCommandList() {
-            this.addCommand("✔", "ok");
+            this.addCommand(OK_BUTTON_TEXT, "ok");
         }
 
         /**
